@@ -1195,7 +1195,29 @@ function assistantView(){
     <p class="tiny muted" style="text-align:center">Hints first. Your thinking matters more than a quick answer.</p></div></div></div>`;
 }
 const chatHTML=s=>{const a=V.ai,hi=`<div class="msg bot"><span class="who">Matherial study guide</span><div class="bubble"><p>${s?`Hi! I can see you’re on <b>${esc(s.title)}</b>. Tell me which step feels tricky, or paste the question you’re stuck on.`:'Hi! Tell me what you’re working on and which step feels tricky. I’ll start with a hint.'}</p></div></div>`;return hi+a.msgs.map(aiMsgHTML).join('')};
-function refreshChat(){const c=$('#chat');if(!c)return;c.innerHTML=chatHTML(V.ai.ctx&&S[V.ai.ctx]?S[V.ai.ctx]:lastSec());const b=$('#asend');if(b)b.disabled=V.ai.busy;const last=c.lastElementChild;if(last)last.scrollIntoView({block:'nearest'})}
+    function refreshChat() {
+        const c = $('#chat');
+        if (!c) return;
+        c.innerHTML = chatHTML(V.ai.ctx && S[V.ai.ctx] ? S[V.ai.ctx] : lastSec());
+        if (typeof renderMathInElement === 'function') {
+            try {
+                renderMathInElement(c, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '\\(', right: '\\)', display: false }
+                    ],
+                    throwOnError: false
+                });
+            } catch (e) { }
+        }
+        const b = $('#asend');
+        if (b) b.disabled = V.ai.busy;
+        const last = c.lastElementChild;
+        if (last) last.scrollIntoView({ block: 'nearest' });
+    }
+
 /* ================= Gemini study guide + multimedia attachments ================= */
 const AI_API = 'https://aiwiszquiemfqzpijglm.supabase.co/functions/v1/Gemini';
 const AI_MAX_ATT=6;
