@@ -852,7 +852,12 @@ repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m
 vol:'<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>',
 up:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
 check:'<path d="M20 6 9 17l-5-5"/>',spark:'<path d="M9.9 4.2 11 8l3.8 1.1L11 10.2 9.9 14 8.8 10.2 5 9.1 8.8 8z"/><path d="M18 14l.7 2.3L21 17l-2.3.7L18 20l-.7-2.3L15 17l2.3-.7z"/>',
-send:'<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',lines:'<path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>'};
+send:'<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',lines:'<path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>',clip:'<path d="m21.4 11.6-8.9 8.9a5.6 5.6 0 0 1-7.9-7.9l9.4-9.4a3.7 3.7 0 0 1 5.2 5.2l-9.4 9.4a1.9 1.9 0 0 1-2.6-2.6l8.5-8.5"/>',
+image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m22 8-6 4 6 4z"/>',
+x:'<path d="M18 6 6 18M6 6l12 12"/>',
+retry:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'};
 const ico=(n,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
 
 /* ---------- viz ---------- */
@@ -978,7 +983,7 @@ const timerNote=()=>M.playing&&M.end?' · stops in '+fmt((M.end-Date.now())/1000
 const lastSec=()=>P.last&&S[P.last]?S[P.last]:null;
 const V={view:'home',grade:lastSec()?lastSec().c.g.id:DATA[0].id,chap:lastSec()?lastSec().c.id:null,sec:lastSec()?lastSec().id:null,
   q:'',fg:{},ft:{chapter:true,lesson:true,example:true},tab:'all',sort:'rel',
-  ai:{msgs:[],mode:'hint',busy:false,pending:null,problem:null,ctx:null,draft:''},
+  ai:{msgs:[],mode:'hint',busy:false,pending:null,problem:null,ctx:null,draft:'',att:[],err:'',menuOpen:false,runId:0},
   rep:{cat:'',where:'',sum:'',what:'',steps:'',shot:null,shotErr:'',tech:true,detach:false,errors:{},fail:false},lastRep:null};
 DATA.forEach(g=>V.fg[g.id]=true);
 const nextSec=s=>{const c=s.c;if(c.sections[s.i+1])return c.sections[s.i+1];const cs=c.g.chapters,k=cs.indexOf(c);return cs[k+1]?cs[k+1].sections[0]:null};
@@ -1120,12 +1125,17 @@ function musicView(){
 /* ----- assistant ----- */
 const AI_MODES={hint:['One small hint','Give exactly one small hint, then ask the student to try the next step. Do not state the final answer.'],explain:['Explain it differently','Explain the idea a different way with an everyday analogy, then ask one short check question.'],similar:['Try a similar example','Give a similar example with different numbers, work only its first step, and let the student try the rest.']};
 function aiMsgHTML(m){
-  if(m.r==='you')return `<div class="msg you"><span class="who">You</span><div class="bubble">${esc(m.t).replace(/\n/g,'<br>')}</div></div>`;
+  if(m.r==='you'){
+    const chips=(m.att||[]).map(f=>`<span class="att-chip">${ico(f.kind==='image'?'image':f.kind==='video'?'video':'file',12)}<span>${esc(f.name)}</span></span>`).join('');
+    const body=m.t?esc(m.t).replace(/\n/g,'<br>'):'';
+    return `<div class="msg you"><span class="who">You</span><div class="bubble">${body}${chips?`<span class="att-chips">${chips}</span>`:''}</div></div>`;
+  }
   const body=m.busy&&!m.t?'<span class="typing" aria-label="Thinking"><i></i><i></i><i></i></span>':esc(m.t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').split(/\n{2,}/).map(p=>`<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
   return `<div class="msg bot"><span class="who">Matherial study guide</span><div class="bubble">${body}</div></div>`;
 }
+
 function assistantView(){
-  const s=V.ai.ctx&&S[V.ai.ctx]?S[V.ai.ctx]:lastSec(),a=V.ai;
+  const s=V.ai.ctx&&S[V.ai.ctx]?S[V.ai.ctx]:lastSec(),a=V.ai;a.menuOpen=false;
   return `<div class="page wrap">
   <div class="head"><div><span class="eyebrow">Think it through, together</span><h1 class="h1">A guide, not a shortcut.</h1><p class="lede">Ask about a tricky step. We’ll use hints and explanations to help you understand it yourself.</p></div>${s?'<button class="btn ghost" data-a="back">← Back to lesson</button>':''}</div>
   <div class="aw"><aside class="side">
@@ -1137,29 +1147,419 @@ function assistantView(){
   <div class="card convo"><div class="convo-bar"><span style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600;color:var(--ink)"><span style="color:var(--accent)">${ico('spark')}</span>Your study guide</span><button class="small muted" data-a="newconv">New conversation +</button></div>
     <div class="side" style="gap:18px" id="chat" aria-live="polite">${chatHTML(s)}</div>
     <div class="chips">${['Why does that work?','Show me a similar example','I’m stuck on the first step'].map(x=>`<button class="chip" data-a="chip" data-t="${esc(x)}">${x}</button>`).join('')}</div>
-    <form class="composer" id="aform"><label class="sr" for="atext">Message</label><textarea id="atext" placeholder="Try the next step, or tell me what still feels confusing…" rows="2">${esc(a.draft)}</textarea><div class="row2"><span class="tiny muted">Enter to send · Shift + Enter for a new line</span><button class="btn" type="submit" id="asend" ${a.busy?'disabled':''}>${ico('send',16)}Send</button></div></form>
+    ${aiComposer(a)}
     <p class="tiny muted" style="text-align:center">Hints first. Your thinking matters more than a quick answer.</p></div></div></div>`;
 }
 const chatHTML=s=>{const a=V.ai,hi=`<div class="msg bot"><span class="who">Matherial study guide</span><div class="bubble"><p>${s?`Hi! I can see you’re on <b>${esc(s.title)}</b>. Tell me which step feels tricky, or paste the question you’re stuck on.`:'Hi! Tell me what you’re working on and which step feels tricky. I’ll start with a hint.'}</p></div></div>`;return hi+a.msgs.map(aiMsgHTML).join('')};
 function refreshChat(){const c=$('#chat');if(!c)return;c.innerHTML=chatHTML(V.ai.ctx&&S[V.ai.ctx]?S[V.ai.ctx]:lastSec());const b=$('#asend');if(b)b.disabled=V.ai.busy;const last=c.lastElementChild;if(last)last.scrollIntoView({block:'nearest'})}
-async function getSample(){try{return window.claude&&window.claude.use?await window.claude.use('sample'):null}catch(e){return null}}
-async function askGuide(text){
-  const a=V.ai;text=text.trim();if(!text||a.busy)return;
-  const s=a.ctx&&S[a.ctx]?S[a.ctx]:lastSec();
-  a.msgs.push({r:'you',t:text});const bot={r:'bot',t:'',busy:true};a.msgs.push(bot);a.busy=true;a.draft='';const ta=$('#atext');if(ta)ta.value='';refreshChat();
-  const sample=await getSample();
-  if(!sample){bot.busy=false;bot.t='The study guide can’t connect in this view. Try the worked examples in your lesson, and compare each step with the solution.';a.busy=false;refreshChat();return}
-  const ctx=s?`The student is reading the lesson "${s.title}" (${pathOf(s)}). Lesson text (excerpt): ${s.text.slice(0,3200)}`:'No lesson is attached.';
-  const sys=`You are the Matherial study guide for students in grades 7 to 9 studying a mathematics module (some content is for the Indonesian TKA exam). Teach by guiding, not by telling.
-Rules: reply in at most 90 words. Ask one guiding question at a time. Never give the final answer to a practice problem until the student has attempted it and asked again after a hint. Write math in plain text (use ^ for powers, sqrt() for roots, no LaTeX). Be warm and brief. If the student writes in Indonesian, reply in Indonesian.
-Help style requested: ${AI_MODES[a.mode][1]}
-${ctx}${a.problem?`\nCurrent problem the student chose: ${a.problem}`:''}`;
-  const hist=a.msgs.filter(m=>!m.busy&&m.t).map(m=>({role:m.r==='you'?'user':'assistant',content:m.t}));
-  hist[0]={role:'user',content:sys+'\n\nStudent message: '+hist[0].content};
-  try{const r=await sample(hist,{cache:false,onText:({text:t})=>{bot.t=t;if(V.view==='assistant')refreshChat()}});bot.t=(r&&r.text)||bot.t||'I couldn’t think of a good hint. Try asking in a different way.'}
-  catch(err){bot.t=err&&err.code==='not_granted'?'The study guide needs your permission to run. Send your message again and choose Allow.':err&&err.code==='rate_limited'?'The guide needs a short break. Try again in a minute.':'Something went wrong reaching the guide. Your lesson is safe. Try again in a moment.'}
-  bot.busy=false;a.busy=false;if(V.view==='assistant')refreshChat();
+/* ================= Gemini study guide + multimedia attachments ================= */
+const AI_API = 'https://aiwiszquiemfqzpijglm.supabase.co/functions/v1/Gemini';
+const AI_MAX_ATT=6;
+const AI_TIMEOUT=120000;
+const AI_LIMIT_MB={image:20,document:50,video:100};
+const AI_MIME={
+  'image/png':'image','image/jpeg':'image','image/webp':'image','image/heic':'image','image/heif':'image',
+  'application/pdf':'document','text/plain':'document','text/csv':'document',
+  'video/mp4':'video','video/mpeg':'video','video/mov':'video','video/avi':'video','video/x-flv':'video',
+  'video/mpg':'video','video/webm':'video','video/wmv':'video','video/3gpp':'video'
+};
+const AI_EXT={'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','webp':'image/webp','heic':'image/heic','heif':'image/heif',
+  'pdf':'application/pdf','txt':'text/plain','csv':'text/csv','mp4':'video/mp4','m4v':'video/mp4','mov':'video/mov',
+  'webm':'video/webm','avi':'video/avi','mpeg':'video/mpeg','mpg':'video/mpeg','wmv':'video/wmv','3gp':'video/3gpp','flv':'video/x-flv'};
+const AI_LABEL={image:'Photo',document:'Document',video:'Video',file:'File'};
+let aiSeq=0,aiCtl=null;
+
+const aiT=(s,v)=>{try{const f=window.MXP&&window.MXP.t;if(typeof f==='function')return f(s,v)}catch(e){}return s};
+const aiUid=()=>'att'+(++aiSeq)+'-'+Date.now().toString(36);
+const aiMB=n=>{const v=n/1048576;return (v>=10?Math.round(v):Math.round(v*10)/10)+''};
+const aiSize=n=>n>=1048576?aiMB(n)+' MB':n>=1024?Math.round(n/1024)+' KB':Math.max(0,Math.round(n))+' B';
+
+function aiMimeOf(f){
+  let m=String(f.type||'').toLowerCase();
+  const ext=String(f.name||'').split('.').pop().toLowerCase();
+  if(ext==='mov'&&(!m||m==='video/quicktime'))m='video/mov';
+  if(ext==='csv'&&(!m||m==='application/vnd.ms-excel'))m='text/csv';
+  if(ext==='txt'&&!m)m='text/plain';
+  if(!m&&AI_EXT[ext])m=AI_EXT[ext];
+  if(m==='image/jpg')m='image/jpeg';
+  if(m==='video/x-msvideo')m='video/avi';
+  if(m==='video/x-ms-wmv')m='video/wmv';
+  if(m==='application/csv')m='text/csv';
+  return m;
 }
+const aiKindOf=m=>AI_MIME[m]||null;
+
+function aiApiError(status,payload){
+  const code=payload&&payload.error&&payload.error.code?String(payload.error.code):'';
+  const table={
+    not_configured:'The study guide isn’t connected yet. Add the Gemini_API_Key_Matherial secret on the server, then try again.',
+    rate_limited:'The guide needs a short break. Try again in a minute.',
+    unsupported_type:'That file type isn’t supported.',
+    file_too_large:'That file is bigger than this server accepts. Try a smaller file.',
+    timeout:'The guide took too long to answer. Your message is still here — try again.',
+    bad_request:'Something in that message wasn’t accepted. Try rephrasing it.',
+    blocked:'That question couldn’t be answered. Try asking it a different way.',
+    model_unavailable:'The guide isn’t available right now. Try again later.',
+    forbidden:'The study guide can’t be reached from this page.',
+    busy:'The guide is already answering. Wait for it to finish.'
+  };
+  if(status===413)return aiT(table.file_too_large);
+  return aiT(table[code]||'We couldn’t reach the study guide. Check your connection and try again.');
+}
+
+function aiAttStatus(f){
+  if(f.state==='uploading')return aiT('Uploading…')+' '+f.prog+'%';
+  if(f.state==='processing')return aiT('Processing…');
+  if(f.state==='error')return aiT(f.err||'Upload failed.');
+  if(f.state==='ready')return aiT('Ready');
+  return aiT('Ready to send');
+}
+
+function aiAttCard(f){
+  const ext=String(f.name||'').split('.').pop().toUpperCase().slice(0,4);
+  const label=ext||aiT(AI_LABEL[f.kind]||AI_LABEL.file);
+  const thumb=f.kind==='image'&&/^image\/(png|jpeg|webp)$/.test(f.mime)
+    ?`<img src="${f.url}" alt="" loading="lazy" decoding="async">`
+    :f.kind==='video'
+      ?`<video src="${f.url}" muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"></video><span class="att-play">${ico('play',18)}</span>`
+      :`<span class="att-file">${ico(f.kind==='image'?'image':'file',22)}</span>`;
+  const cls=f.state==='error'?' bad':f.state==='ready'?' ok':'';
+  return `<figure class="att-card ${f.state}" data-att-card="${f.id}">
+    <div class="att-thumb">${thumb}<span class="att-prog" ${f.state==='uploading'?'':'hidden'}><i style="width:${f.prog||0}%"></i></span><span class="att-spin" ${f.state==='processing'?'':'hidden'} aria-hidden="true"></span></div>
+    <figcaption><b title="${esc(f.name)}">${esc(f.name)}</b><span>${esc(label)} · ${aiSize(f.size)}</span><span class="att-st${cls}" data-att-st>${esc(aiAttStatus(f))}</span></figcaption>
+    <button type="button" class="att-x" data-a="attrm" data-id="${f.id}" aria-label="${esc(aiT('Remove {n}',{n:f.name}))}">${ico('x',14)}</button>
+    <button type="button" class="att-retry" data-a="attretry" data-id="${f.id}" ${f.state==='error'?'':'hidden'}>${ico('retry',12)}${esc(aiT('Retry'))}</button>
+  </figure>`;
+}
+
+function aiAttPanelHTML(){
+  return `<div class="att-panel" id="att-panel" role="menu" aria-label="${esc(aiT('Attach files'))}" hidden>
+    <p class="att-panel-t">${esc(aiT('Add to your message'))}</p>
+    <button type="button" role="menuitem" class="att-opt" data-a="attpick" data-kind="image">${ico('image',18)}<span><b>${esc(aiT('Photos'))}</b><small>${esc(aiT('PNG, JPEG, WEBP, HEIC'))}</small></span></button>
+    <button type="button" role="menuitem" class="att-opt" data-a="attpick" data-kind="document">${ico('file',18)}<span><b>${esc(aiT('Documents'))}</b><small>${esc(aiT('PDF, TXT, CSV'))}</small></span></button>
+    <button type="button" role="menuitem" class="att-opt" data-a="attpick" data-kind="video">${ico('video',18)}<span><b>${esc(aiT('Videos'))}</b><small>${esc(aiT('MP4, MOV, WEBM, AVI'))}</small></span></button>
+    <p class="att-note">${esc(aiT('Up to {n} files · images {i} MB · documents {d} MB · videos {v} MB',{n:AI_MAX_ATT,i:AI_LIMIT_MB.image,d:AI_LIMIT_MB.document,v:AI_LIMIT_MB.video}))}</p>
+  </div>`;
+}
+
+function aiComposer(a){
+  return `<form class="composer" id="aform" aria-busy="${a.busy?'true':'false'}">
+    ${aiAttPanelHTML()}
+    <div class="att-drop" aria-hidden="true"><span>${ico('up',20)}${esc(aiT('Drop files to attach'))}</span></div>
+    <p class="att-alert" id="ai-err" role="alert" ${a.err?'':'hidden'}>${esc(a.err?aiT(a.err):'')}</p>
+    <div class="att-list" id="att-list">${a.att.map(aiAttCard).join('')}</div>
+    <div class="composer-main">
+      <button type="button" class="att-btn" id="att-btn" data-a="attmenu" aria-haspopup="menu" aria-expanded="false" aria-controls="att-panel" aria-label="${esc(aiT('Attach files'))}" title="${esc(aiT('Attach files'))}" ${a.busy?'disabled':''}>${ico('clip',20)}</button>
+      <label class="sr" for="atext">Message</label>
+      <textarea id="atext" placeholder="Try the next step, or tell me what still feels confusing…" rows="2">${esc(a.draft)}</textarea>
+    </div>
+    <div class="row2"><span class="tiny muted">Enter to send · Shift + Enter for a new line <span class="att-hint" id="att-hint" role="status" aria-live="polite"></span></span><button class="btn" type="submit" id="asend" ${a.busy?'disabled':''}>${ico('send',16)}Send</button></div>
+    <input type="file" id="att-image" accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.png,.jpg,.jpeg,.webp,.heic,.heif" multiple hidden>
+    <input type="file" id="att-document" accept="application/pdf,text/plain,text/csv,.pdf,.txt,.csv" multiple hidden>
+    <input type="file" id="att-video" accept="video/mp4,video/mpeg,video/mov,video/webm,video/avi,video/x-flv,video/wmv,video/3gpp,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.wmv,.3gp" multiple hidden>
+  </form>`;
+}
+
+function aiToggleMenu(open,refocus){
+  const panel=$('#att-panel'),btn=$('#att-btn');
+  if(!panel||!btn)return;
+  if(open){
+    V.ai.menuOpen=true;panel.hidden=false;panel.classList.remove('out');btn.setAttribute('aria-expanded','true');
+    setTimeout(()=>{const first=panel.querySelector('.att-opt');if(first&&V.ai.menuOpen)first.focus()},30);
+  }else{
+    V.ai.menuOpen=false;btn.setAttribute('aria-expanded','false');panel.classList.add('out');
+    setTimeout(()=>{if(!V.ai.menuOpen){panel.hidden=true;panel.classList.remove('out')}},lowMotion()?0:160);
+    if(refocus)btn.focus();
+  }
+}
+
+function aiPaintItem(f){
+  const card=$('[data-att-card="'+f.id+'"]');
+  if(!card)return;
+  card.className='att-card '+f.state;
+  const st=card.querySelector('[data-att-st]');
+  if(st){st.textContent=aiAttStatus(f);st.className='att-st'+(f.state==='error'?' bad':f.state==='ready'?' ok':'')}
+  const prog=card.querySelector('.att-prog');if(prog)prog.hidden=f.state!=='uploading';
+  const fill=card.querySelector('.att-prog i');if(fill)fill.style.width=(f.prog||0)+'%';
+  const spin=card.querySelector('.att-spin');if(spin)spin.hidden=f.state!=='processing';
+  const retry=card.querySelector('.att-retry');if(retry)retry.hidden=f.state!=='error';
+}
+
+function aiRenderList(){
+  const el=$('#att-list');
+  if(el)el.innerHTML=V.ai.att.map(aiAttCard).join('');
+}
+
+function aiPaintHint(){
+  const el=$('#att-hint');
+  if(!el)return;
+  const busy=V.ai.att.some(f=>f.state==='uploading'||f.state==='processing');
+  el.textContent=busy?aiT('Uploading attachments…'):(V.ai.att.length?aiT('{n} attached',{n:V.ai.att.length}):'');
+}
+
+function aiPaintError(){
+  const el=$('#ai-err');
+  if(!el)return;
+  if(V.ai.err){el.textContent=aiT(V.ai.err);el.hidden=false}else{el.hidden=true;el.textContent=''}
+}
+
+function aiSetBusy(busy){
+  const send=$('#asend'),btn=$('#att-btn'),form=$('#aform');
+  if(send)send.disabled=!!busy;
+  if(btn)btn.disabled=!!busy;
+  if(form)form.setAttribute('aria-busy',busy?'true':'false');
+  if(busy&&V.ai.menuOpen)aiToggleMenu(false,false);
+}
+
+function aiFind(id){return V.ai.att.filter(f=>f.id===id)[0]||null}
+
+function aiAddFiles(list){
+  const a=V.ai;
+  if(a.busy)return;
+  const files=list?Array.prototype.slice.call(list):[];
+  let added=0,error='';
+  files.forEach(f=>{
+    if(!f)return;
+    const mime=aiMimeOf(f),kind=aiKindOf(mime);
+    if(!kind){error=aiT('That file type isn’t supported. Use PNG, JPEG, WEBP, HEIC, PDF, TXT, CSV, MP4, MOV, WebM, AVI, MPEG, WMV or 3GPP.');return}
+    if(!f.size){error=aiT('“{n}” is empty. Choose another file.',{n:f.name||aiT('Attachment')});return}
+    if(f.size>AI_LIMIT_MB[kind]*1048576){error=aiT('“{n}” is too large. The limit is {m} MB.',{n:f.name||aiT('Attachment'),m:AI_LIMIT_MB[kind]});return}
+    if(a.att.length>=AI_MAX_ATT){error=aiT('You can attach up to {n} files per message.',{n:AI_MAX_ATT});return}
+    if(a.att.some(x=>x.name===f.name&&x.size===f.size&&x.file.lastModified===f.lastModified)){added++;return}
+    let url='';
+    try{url=URL.createObjectURL(f)}catch(e){url=''}
+    a.att.push({id:aiUid(),file:f,name:f.name||('attachment.'+(String(f.name||'').split('.').pop()||'bin')),size:f.size,mime,kind,url,state:'queued',prog:0,uri:'',fname:'',err:''});
+    added++;
+  });
+  if(error)a.err=error;
+  else if(added)a.err='';
+  aiRenderList();aiPaintHint();aiPaintError();
+  if(!added&&!error&&files.length)a.err=aiT('Those files are already attached.');
+  if(!added&&!error&&files.length)aiPaintError();
+}
+
+function aiRemoveAtt(id){
+  const a=V.ai;
+  if(a.busy)return;
+  const i=a.att.findIndex(f=>f.id===id);
+  if(i<0)return;
+  const f=a.att[i];
+  a.att.splice(i,1);
+  if(f.url)URL.revokeObjectURL(f.url);
+  if(f.fname)aiDeleteRemote(f.fname);
+  a.err='';
+  aiRenderList();aiPaintHint();aiPaintError();
+}
+
+function aiDeleteRemote(name){
+  if(!name)return;
+  try{fetch(AI_API+'?action=delete',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).catch(()=>{})}catch(e){}
+}
+
+function aiUploadOne(f){
+  return new Promise((resolve,reject)=>{
+    if(!f)return reject(new Error(aiT('Upload failed.')));
+    f.state='uploading';f.prog=0;f.err='';
+    aiPaintItem(f);aiPaintHint();
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',AI_API+'?action=upload&name='+encodeURIComponent(f.name)+'&mimeType='+encodeURIComponent(f.mime));
+    xhr.setRequestHeader('Content-Type','application/octet-stream');
+    xhr.timeout=180000;
+    let lastPaint=0;
+    xhr.upload.onprogress=e=>{
+      if(!e.lengthComputable)return;
+      const now=Date.now();
+      if(now-lastPaint<110)return;
+      lastPaint=now;
+      f.prog=Math.max(1,Math.min(99,Math.round(e.loaded/e.total*100)));
+      aiPaintItem(f);
+    };
+    const done=()=>{aiPaintHint();aiSetBusy(V.ai.busy)};
+    xhr.onload=()=>{
+      let j=null;
+      try{j=JSON.parse(xhr.responseText||'null')}catch(e){j=null}
+      if(xhr.status>=200&&xhr.status<300&&j&&j.uri){
+        f.uri=j.uri;f.fname=j.name||'';
+        f.state=j.state==='PROCESSING'?'processing':'ready';
+        f.prog=100;
+        aiPaintItem(f);done();
+        if(f.state==='processing'){
+          aiWatchFile(f).then(()=>resolve(f)).catch(err=>{
+            f.state='error';f.err=(err&&err.message)||aiT('Video processing failed. Try a shorter clip.');
+            aiPaintItem(f);done();reject(err);
+          });
+        }else resolve(f);
+        return;
+      }
+      f.state='error';f.err=aiApiError(xhr.status,j);
+      aiPaintItem(f);done();reject(new Error(f.err));
+    };
+    xhr.onerror=()=>{f.state='error';f.err=aiT('Upload failed. Check your connection and try again.');aiPaintItem(f);done();reject(new Error(f.err))};
+    xhr.ontimeout=()=>{f.state='error';f.err=aiT('The upload took too long. Try again.');aiPaintItem(f);done();reject(new Error(f.err))};
+    xhr.send(f.file);
+  });
+}
+
+const aiUploads=new Map();
+function aiUploadOnce(f){
+  if(!f)return Promise.reject(new Error(aiT('Upload failed.')));
+  if(f.uri)return Promise.resolve(f);
+  if(aiUploads.has(f.id))return aiUploads.get(f.id);
+  const p=aiUploadOne(f).finally(()=>{aiUploads.delete(f.id)});
+    aiUploads.set(f.id, p);
+  return p;
+}
+
+async function aiWatchFile(f){
+  for(let i=0;i<45;i++){
+    await new Promise(r=>setTimeout(r,2000));
+    let res,j=null;
+    try{
+      res=await fetch(AI_API+'?action=file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.fname})});
+      j=await res.json().catch(()=>null);
+    }catch(e){
+      throw new Error(aiT('We lost track of that upload. Try again.'));
+    }
+    if(!res.ok)throw new Error(aiApiError(res.status,j));
+    if(j&&j.state==='ACTIVE'){f.state='ready';aiPaintItem(f);return f}
+    if(j&&j.state==='FAILED')throw new Error(aiT('Gemini couldn’t process that file. Try a shorter clip or a different file.'));
+  }
+  throw new Error(aiT('That video is taking too long to process. Try a shorter clip.'));
+}
+
+function clearAiConversation(){
+  const a=V.ai;
+  a.runId=(a.runId||0)+1;
+  if(aiCtl){try{aiCtl.abort()}catch(e){}aiCtl=null}
+  a.msgs.forEach(m=>(m.att||[]).forEach(x=>aiDeleteRemote(x.fname)));
+  a.att.forEach(f=>{if(f.url)URL.revokeObjectURL(f.url);aiDeleteRemote(f.fname)});
+  a.msgs=[];a.att=[];a.busy=false;a.problem=null;a.err='';a.menuOpen=false;a.draft='';
+}
+
+/* Kept for the existing translation provider chain: its first optional
+   provider is unavailable in this deployment, so translation falls back. */
+async function getSample(){return null}
+
+async function askGuide(text){
+  const a=V.ai;
+  text=String(text||'').trim();
+  if(a.busy)return;
+  if(!text&&!a.att.length){
+    a.err=aiT('Add a message or an attachment first.');
+    aiPaintError();
+    const box=$('#atext');if(box)box.focus();
+    return;
+  }
+  const s=a.ctx&&S[a.ctx]?S[a.ctx]:lastSec();
+  const run=(a.runId||0)+1;
+  a.runId=run;
+  a.err='';a.busy=true;a.draft='';a.menuOpen=false;
+  const box=$('#atext');if(box)box.value='';
+  const files=a.att.slice();
+  const user={r:'you',t:text,att:files.map(f=>({name:f.name,mime:f.mime,kind:f.kind,size:f.size,uri:f.uri||'',fname:f.fname||''}))};
+  const bot={r:'bot',t:'',busy:true};
+  a.msgs.push(user);a.msgs.push(bot);
+  refreshChat();aiPaintError();aiSetBusy(true);aiPaintHint();
+
+  try{
+    for(const f of files){
+      if(!f.uri)await aiUploadOnce(f);
+      if(a.runId!==run)return;
+    }
+
+    user.att=files.map(f=>({name:f.name,mime:f.mime,kind:f.kind,size:f.size,uri:f.uri||'',fname:f.fname||''}));
+    const lang=document.documentElement.lang==='id'?'id':'en';
+    const payload={
+      history:a.msgs.filter(m=>m!==bot).filter(m=>!m.busy&&(m.t||(m.att&&m.att.length))).slice(-16).map(m=>({
+        role:m.r==='you'?'user':'model',
+        text:m.t||'',
+        attachments:(m.att||[]).filter(x=>x.uri).map(x=>({uri:x.uri,mimeType:x.mime,name:x.name}))
+      })),
+      context:{
+        lesson:s?{title:s.title,chapter:pathOf(s),excerpt:String(s.text||'').slice(0,4000)}:null,
+        problem:a.problem||null,
+        mode:a.mode
+      },
+      lang:lang
+    };
+
+    const ctl=new AbortController();
+    aiCtl=ctl;
+    const timer=setTimeout(()=>{try{ctl.abort()}catch(e){}},AI_TIMEOUT);
+    let res;
+    try{
+      res=await fetch(AI_API+'?action=chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctl.signal});
+    }finally{
+      clearTimeout(timer);
+    }
+    if(a.runId!==run)return;
+    if(!res.ok){
+      let j=null;try{j=await res.json()}catch(e){j=null}
+      throw new Error(aiApiError(res.status,j));
+    }
+    if(!res.body||!res.body.getReader)throw new Error(aiT('This browser can’t stream the answer. Try another browser.'));
+
+    const reader=res.body.getReader(),dec=new TextDecoder();
+    let buffer='',full='',lastPaint=0;
+    while(true){
+      const chunk=await reader.read();
+      if(chunk.done)break;
+      if(a.runId!==run)return;
+      buffer+=dec.decode(chunk.value,{stream:true}).replace(/\r/g,'');
+      let cut;
+      while((cut=buffer.indexOf('\n\n'))>=0){
+        const block=buffer.slice(0,cut);
+        buffer=buffer.slice(cut+2);
+        const line=block.split('\n').filter(l=>l.trim().indexOf('data:')===0)[0];
+        if(!line)continue;
+        const data=line.trim().slice(5).trim();
+        if(!data||data==='[DONE]')continue;
+        let event=null;
+        try{event=JSON.parse(data)}catch(e){continue}
+        if(event.error)throw new Error(aiApiError(event.error.status||502,{error:event.error}));
+        if(event.text){
+          full+=event.text;
+          bot.t=full;
+          const now=Date.now();
+          if(now-lastPaint>60){lastPaint=now;if(V.view==='assistant')refreshChat()}
+        }
+      }
+    }
+    if(a.runId!==run)return;
+    if(!full.trim())throw new Error(aiT('The guide didn’t return an answer. Try asking in a different way.'));
+
+    bot.t=full.trim();bot.busy=false;
+    a.busy=false;
+    files.forEach(f=>{if(f.url)URL.revokeObjectURL(f.url)});
+    a.att=[];
+    if(V.view==='assistant'){
+      render();
+      const t=$('#atext');if(t)t.focus();
+    }
+  }catch(err){
+    if(a.runId!==run)return;
+    const bi=a.msgs.indexOf(bot);if(bi>=0)a.msgs.splice(bi,1);
+    const ui=a.msgs.indexOf(user);if(ui>=0)a.msgs.splice(ui,1);
+    const live=(($('#atext')||{}).value||'');
+    a.busy=false;a.draft=live.trim()?live:text;
+    a.err=(err&&err.name==='AbortError')
+      ?aiT('The guide took too long to answer. Your message is still here — try again.')
+      :((err&&err.message)||aiT('We couldn’t reach the study guide. Check your connection and try again.'));
+    if(V.view==='assistant'){
+      render();
+      const t=$('#atext');
+      if(t){t.focus();try{t.setSelectionRange(t.value.length,t.value.length)}catch(e){}}
+    }
+  }finally{
+    aiCtl=null;
+    if(a.runId===run){
+      a.busy=false;
+      aiSetBusy(false);
+      if(V.view==='assistant'){refreshChat();aiPaintError();aiPaintHint()}
+    }
+  }
+}
+
 
 /* ----- report ----- */
 const CATS=['Button or interaction','Something looks wrong','Math content error','Audio or music problem','Page is slow or stuck','Other'];
@@ -1266,7 +1666,7 @@ const A={
   space:b=>pickSpace(b.dataset.id),track:b=>pickTrack(+b.dataset.i),
   mode:b=>{V.ai.mode=b.dataset.k;const y=scrollY;render();scrollTo(0,y)},
   chip:b=>askGuide(b.dataset.t),
-  newconv:()=>{V.ai.msgs=[];V.ai.busy=false;V.ai.problem=null;render()},
+  newconv:()=>{clearAiConversation();render()},
   sclear:()=>{V.q='';V.focusQ=true;render()},sq:b=>{V.q=b.dataset.q;V.tab='all';render()},
   sreset:()=>{DATA.forEach(g=>V.fg[g.id]=true);V.ft={chapter:true,lesson:true,example:true};V.tab='all';render()},
   stab:b=>{V.tab=b.dataset.k;render()},
@@ -1274,6 +1674,65 @@ const A={
   detach:()=>{V.rep.detach=true;render()},attach:()=>{V.rep.detach=false;render()},
   newreport:()=>{V.rep=newRep();go('report')}
 };
+Object.assign(A,{
+  attmenu:()=>{if(!V.ai.busy)aiToggleMenu(!V.ai.menuOpen)},
+  attpick:b=>{const kind=b.dataset.kind;aiToggleMenu(false,false);const input=$('#att-'+kind);if(input){input.value='';input.click()}},
+  attrm:b=>aiRemoveAtt(b.dataset.id),
+  attretry:b=>{const f=aiFind(b.dataset.id);if(!f||V.ai.busy)return;aiUploadOnce(f).catch(()=>{})}
+});
+
+document.addEventListener('change',e=>{
+  const id=e.target.id;
+  if(id==='att-image'||id==='att-document'||id==='att-video'){
+    aiAddFiles(e.target.files);
+    e.target.value='';
+  }
+});
+
+document.addEventListener('click',e=>{
+  if(!V.ai.menuOpen)return;
+  if(e.target.closest&&(e.target.closest('#att-panel')||e.target.closest('#att-btn')))return;
+  aiToggleMenu(false,false);
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&V.ai.menuOpen)aiToggleMenu(false,true);
+});
+
+let aiDragDepth=0;
+document.addEventListener('dragenter',e=>{
+  const form=e.target.closest&&e.target.closest('#aform');
+  if(!form||!e.dataTransfer)return;
+  if(e.dataTransfer.types&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')<0)return;
+  e.preventDefault();aiDragDepth++;form.classList.add('dragging');
+});
+document.addEventListener('dragover',e=>{
+  const form=e.target.closest&&e.target.closest('#aform');
+  if(!form||!e.dataTransfer)return;
+  if(e.dataTransfer.types&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')<0)return;
+  e.preventDefault();e.dataTransfer.dropEffect='copy';
+});
+document.addEventListener('dragleave',e=>{
+  const form=e.target.closest&&e.target.closest('#aform');
+  if(!form)return;
+  aiDragDepth=Math.max(0,aiDragDepth-1);
+  if(!aiDragDepth)form.classList.remove('dragging');
+});
+document.addEventListener('drop',e=>{
+  const form=e.target.closest&&e.target.closest('#aform');
+  if(!form)return;
+  e.preventDefault();aiDragDepth=0;form.classList.remove('dragging');
+  if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)aiAddFiles(e.dataTransfer.files);
+});
+
+addEventListener('pagehide',()=>{
+  const seen={};
+  V.ai.msgs.forEach(m=>(m.att||[]).forEach(x=>{if(x.fname)seen[x.fname]=1}));
+  V.ai.att.forEach(f=>{if(f.fname)seen[f.fname]=1});
+  Object.keys(seen).forEach(name=>aiDeleteRemote(name));
+});
+
+
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.tagName==='INPUT')return;const f=A[b.dataset.a];if(f){e.preventDefault();f(b,e)}});
 document.addEventListener('change',e=>{
   const t=e.target;
@@ -1289,7 +1748,7 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.matches('[data-volr]')){setVol(+t.value);return}
   if(t.id==='sq'){V.q=t.value;clearTimeout(V.st);V.st=setTimeout(()=>{V.focusQ=true;render()},220);return}
-  if(t.id==='atext'){V.ai.draft=t.value;return}
+  if(t.id==='atext'){V.ai.draft=t.value;if(V.ai.err){V.ai.err='';aiPaintError()}return}
   if(t.dataset&&t.dataset.r&&t.type!=='checkbox'){V.rep[t.dataset.r]=t.value}
 });
 document.addEventListener('submit',e=>{
@@ -1942,6 +2401,59 @@ function showApp(){if(landingShell)landingShell.hidden=true;if(appShell)appShell
 function closeAuth(){if(!authModal)return;authModal.classList.remove('on');authModal.hidden=true;authModal.setAttribute('aria-hidden','true');document.body.classList.remove('matherial-modal-open');}
 
 const ID={"Learn": "Belajar", "Music": "Musik", "AI assistant": "Asisten AI", "Translate": "Terjemahkan", "Dashboard": "Dasbor", "Report a bug": "Laporkan masalah", "Accessibility": "Aksesibilitas", "Sign in": "Masuk", "Sign out": "Keluar", "Create account": "Buat akun", "Create an account": "Buat akun", "I already have an account": "Saya sudah punya akun", "Topics, chapters, materials": "Topik, bab, materi", "Small steps. Real understanding.": "Langkah kecil. Pemahaman nyata.", "Make a little room for focus": "Sisihkan sedikit ruang untuk fokus", "A calmer background": "Latar yang lebih tenang", "Settle into your own rhythm.": "Temukan ritmemu sendiri.", "Choose a space": "Pilih ruang", "In this space": "Di ruang ini", "Add your own music": "Tambahkan musikmu sendiri", "A gentle reminder": "Pengingat lembut", "Say it in both languages.": "Ucapkan dalam dua bahasa.", "Direction": "Arah", "Try a phrase": "Coba sebuah frasa", "Swap ⇄": "Tukar ⇄", "Clear": "Hapus", "Copy translation": "Salin terjemahan", "Indonesian → English": "Indonesia → Inggris", "English → Indonesian": "Inggris → Indonesia", "Indonesian": "Indonesia", "English": "Inggris", "Type or paste text here": "Ketik atau tempel teks di sini", "The translation appears here": "Terjemahan muncul di sini", "Ambient drift": "Ambient mengalun", "Light ambient": "Ambient ringan", "Dark ambient": "Ambient gelap", "Chill EDM": "EDM santai", "Focus tones": "Nada fokus", "Noise studio": "Studio noise", "My music": "Musikku", "Your learning": "Pembelajaranmu", "Loading your dashboard…": "Memuat dasbormu…", "We couldn’t load your dashboard.": "Dasbor tidak bisa dimuat.", "Try again": "Coba lagi", "Welcome back, {n}": "Selamat datang kembali, {n}", "Pick up where you left off.": "Lanjutkan dari tempat terakhirmu.", "Enrolled classes": "Kelas diikuti", "In progress": "Sedang berjalan", "Completed": "Selesai", "Average progress": "Rata-rata progres", "My classes": "Kelasku", "{a} of {b} lessons": "{a} dari {b} pelajaran", "Quizzes passed {a}/{b}": "Kuis lulus {a}/{b}", "Continue": "Lanjutkan", "You haven’t started a class yet. Finish a lesson and it will appear here.": "Kamu belum memulai kelas. Selesaikan satu pelajaran dan kelasnya akan muncul di sini.", "Browse classes": "Lihat kelas", "Certificates": "Sertifikat", "View certificate": "Lihat sertifikat", "Finish every lesson and pass each chapter quiz with 70% or more to earn a certificate.": "Selesaikan semua pelajaran dan lulus tiap kuis bab dengan nilai 70% atau lebih untuk mendapat sertifikat.", "Your account": "Akunmu", "Create your account": "Buat akunmu", "Sign in to see your progress": "Masuk untuk melihat progresmu", "Your progress, classes and certificates stay with you on every device.": "Progres, kelas, dan sertifikatmu tersimpan di semua perangkat.", "Backend not connected yet.": "Backend belum terhubung.", "Set the project URL in the script (CFG.url).": "Isi URL proyek di skrip (CFG.url).", "The backend URL is not set yet.": "URL backend belum diisi.", "Name": "Nama", "Email": "Email", "Password": "Kata sandi", "Enter your email and a password of at least 8 characters.": "Masukkan email dan kata sandi minimal 8 karakter.", "One moment…": "Sebentar…", "Almost there! Check your email to confirm your account, then sign in.": "Hampir selesai! Cek emailmu untuk konfirmasi akun, lalu masuk.", "Certificate not found": "Sertifikat tidak ditemukan", "Back to dashboard": "Kembali ke dasbor", "Certificate of Completion": "Sertifikat Penyelesaian", "This certifies that": "Dengan ini menyatakan bahwa", "has completed": "telah menyelesaikan", "Certificate ID": "ID Sertifikat", "Verify at": "Verifikasi di", "Print or save as PDF": "Cetak atau simpan sebagai PDF", "Certificate check": "Pengecekan sertifikat", "This certificate is valid.": "Sertifikat ini valid.", "We couldn’t find this certificate.": "Sertifikat ini tidak ditemukan.", "Checking…": "Memeriksa…"};
+Object.assign(ID,{
+  "Attach files": "Lampirkan berkas",
+  "Add to your message": "Tambahkan ke pesanmu",
+  "Photos": "Foto",
+  "Documents": "Dokumen",
+  "Videos": "Video",
+  "PNG, JPEG, WEBP, HEIC": "PNG, JPEG, WEBP, HEIC",
+  "PDF, TXT, CSV": "PDF, TXT, CSV",
+  "MP4, MOV, WEBM, AVI": "MP4, MOV, WEBM, AVI",
+  "Up to {n} files · images {i} MB · documents {d} MB · videos {v} MB": "Maksimal {n} berkas · gambar {i} MB · dokumen {d} MB · video {v} MB",
+  "Drop files to attach": "Lepaskan berkas untuk dilampirkan",
+  "Photo": "Foto",
+  "Document": "Dokumen",
+  "Video": "Video",
+  "File": "Berkas",
+  "Attachment": "Lampiran",
+  "Remove {n}": "Hapus {n}",
+  "Uploading…": "Mengunggah…",
+  "Processing…": "Memproses…",
+  "Ready": "Siap",
+  "Ready to send": "Siap dikirim",
+  "Upload failed.": "Unggahan gagal.",
+  "Retry": "Coba lagi",
+  "Uploading attachments…": "Mengunggah lampiran…",
+  "{n} attached": "{n} terlampir",
+  "That file type isn’t supported. Use PNG, JPEG, WEBP, HEIC, PDF, TXT, CSV, MP4, MOV, WebM, AVI, MPEG, WMV or 3GPP.": "Jenis berkas itu tidak didukung. Gunakan PNG, JPEG, WEBP, HEIC, PDF, TXT, CSV, MP4, MOV, WebM, AVI, MPEG, WMV, atau 3GPP.",
+  "“{n}” is too large. The limit is {m} MB.": "“{n}” terlalu besar. Batasnya {m} MB.",
+  "“{n}” is empty. Choose another file.": "“{n}” kosong. Pilih berkas lain.",
+  "You can attach up to {n} files per message.": "Kamu bisa melampirkan maksimal {n} berkas per pesan.",
+  "Those files are already attached.": "Berkas itu sudah dilampirkan.",
+  "Add a message or an attachment first.": "Tulis pesan atau lampirkan berkas dulu.",
+  "This browser can’t stream the answer. Try another browser.": "Peramban ini tidak bisa menampilkan jawaban secara bertahap. Coba peramban lain.",
+  "The guide didn’t return an answer. Try asking in a different way.": "Pemandu tidak memberikan jawaban. Coba tanyakan dengan cara lain.",
+  "The guide took too long to answer. Your message is still here — try again.": "Pemandu terlalu lama menjawab. Pesanmu masih ada — coba lagi.",
+  "We couldn’t reach the study guide. Check your connection and try again.": "Kami tidak bisa menghubungi pemandu belajar. Periksa koneksimu dan coba lagi.",
+  "The study guide isn’t connected yet. Add the Gemini_API_Key_Matherial secret on the server, then try again.": "Pemandu belajar belum terhubung. Tambahkan rahasia Gemini_API_Key_Matherial di server, lalu coba lagi.",
+  "The guide needs a short break. Try again in a minute.": "Pemandu perlu istirahat sebentar. Coba lagi dalam satu menit.",
+  "That file type isn’t supported.": "Jenis berkas itu tidak didukung.",
+  "That file is bigger than this server accepts. Try a smaller file.": "Berkas itu lebih besar dari yang bisa diterima server ini. Coba berkas yang lebih kecil.",
+  "The guide couldn’t process that request. Try again in a moment.": "Pemandu tidak bisa memproses permintaan itu. Coba lagi sebentar lagi.",
+  "Something in that message wasn’t accepted. Try rephrasing it.": "Ada bagian pesan yang tidak diterima. Coba ubah kalimatnya.",
+  "That question couldn’t be answered. Try asking it a different way.": "Pertanyaan itu tidak bisa dijawab. Coba tanyakan dengan cara lain.",
+  "The guide isn’t available right now. Try again later.": "Pemandu belum tersedia sekarang. Coba lagi nanti.",
+  "The guide is already answering. Wait for it to finish.": "Pemandu sedang menjawab. Tunggu sampai selesai.",
+  "The study guide can’t be reached from this page.": "Pemandu belajar tidak bisa diakses dari halaman ini.",
+  "Upload failed. Check your connection and try again.": "Unggahan gagal. Periksa koneksimu dan coba lagi.",
+  "The upload took too long. Try again.": "Unggahan terlalu lama. Coba lagi.",
+  "We lost track of that upload. Try again.": "Kami kehilangan jejak unggahan itu. Coba lagi.",
+  "Gemini couldn’t process that file. Try a shorter clip or a different file.": "Gemini tidak bisa memproses berkas itu. Coba klip yang lebih pendek atau berkas lain.",
+  "That video is taking too long to process. Try a shorter clip.": "Video itu terlalu lama diproses. Coba klip yang lebih pendek.",
+  "Video processing failed. Try a shorter clip.": "Pemrosesan video gagal. Coba klip yang lebih pendek."
+});
+
 const nl=(navigator.languages||[]).map(l=>l.slice(0,2)).find(l=>l==='id'||l==='en');
 let lang=localStorage.getItem(LK)||nl||'id';
 const t=(s,v)=>{let r=(lang==='id'&&ID[s])||s;if(v)for(const k in v)r=r.replace('{'+k+'}',v[k]);return r};
@@ -4617,4 +5129,75 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 
 </script>
+<style id="matherial-ai-composer">
+/* ===== Matherial study guide — multimedia composer (scoped to the assistant) ===== */
+.composer{position:relative}
+.composer-main{display:flex;align-items:flex-start;gap:10px}
+.composer-main textarea{flex:1;min-width:0}
+.att-btn{display:grid;place-items:center;flex:none;width:36px;height:36px;margin-top:4px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);transition:color .18s,border-color .18s,background .18s,transform .18s}
+.att-btn:hover{color:var(--accent);border-color:var(--line2);background:color-mix(in srgb,var(--gold) 16%,var(--surface))}
+.att-btn:active{transform:scale(.95)}
+.att-btn[aria-expanded="true"]{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--gold) 22%,var(--surface))}
+.att-btn[disabled]{opacity:.5;cursor:default}
+.att-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.att-list:empty{display:none}
+.att-card{position:relative;margin:0;display:flex;flex-direction:column;min-width:0;background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;animation:attCardIn .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes attCardIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.att-card.uploading,.att-card.processing{border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}
+.att-card.error{border-color:color-mix(in srgb,var(--danger) 55%,var(--line))}
+.att-thumb{position:relative;aspect-ratio:16/10;display:grid;place-items:center;background:linear-gradient(150deg,var(--tint2),color-mix(in srgb,var(--gold) 16%,var(--surface2)));color:var(--accent);overflow:hidden}
+.att-thumb img,.att-thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.att-play{position:absolute;inset:0;display:grid;place-items:center;color:#FFF8EE;background:linear-gradient(180deg,rgba(42,24,10,0) 30%,rgba(42,24,10,.42));pointer-events:none}
+.att-play svg{filter:drop-shadow(0 1px 4px rgba(30,16,6,.5))}
+.att-file{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--surface);border:1px solid var(--line2)}
+.att-prog{position:absolute;left:8px;right:8px;bottom:8px;height:4px;border-radius:4px;background:rgba(255,248,238,.55);overflow:hidden}
+.att-prog i{display:block;height:100%;background:var(--accent);transition:width .2s linear}
+.att-spin{position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--surface) 42%,transparent)}
+.att-spin::after{content:"";width:22px;height:22px;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 28%,transparent);border-top-color:var(--accent);animation:attSpin .8s linear infinite}
+@keyframes attSpin{to{transform:rotate(360deg)}}
+.att-card figcaption{display:flex;flex-direction:column;gap:1px;padding:9px 32px 9px 11px;min-width:0}
+.att-card figcaption b{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-card figcaption span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.02em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-st.ok{color:var(--accent)!important}
+.att-st.bad{color:var(--danger)!important;white-space:normal!important;line-height:1.45}
+.att-x{position:absolute;top:6px;right:6px;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--line);color:var(--muted);transition:color .16s,border-color .16s,transform .16s}
+.att-x:hover{color:var(--danger);border-color:var(--danger);transform:rotate(90deg)}
+.att-retry{display:flex;align-items:center;gap:5px;margin:0 10px 9px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-size:10.5px;font-weight:600;color:var(--accent);align-self:flex-start}
+.att-retry:hover{border-color:var(--accent)}
+.att-panel{position:absolute;z-index:8;left:0;bottom:calc(100% - 4px);width:min(292px,calc(100% - 8px));padding:10px;border-radius:var(--r-md);border:1px solid var(--line2);background:var(--surface);box-shadow:var(--shadow-3);transform-origin:0 100%;animation:attPop .2s cubic-bezier(.2,.9,.25,1) both}
+.att-panel.out{animation:attPopOut .15s ease both}
+@keyframes attPop{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes attPopOut{to{opacity:0;transform:translateY(5px) scale(.98)}}
+.att-panel-t{margin:2px 6px 8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.att-opt{display:flex;align-items:center;gap:11px;width:100%;padding:9px 10px;border-radius:9px;color:var(--ink);transition:background .16s,color .16s}
+.att-opt:hover,.att-opt:focus-visible{background:color-mix(in srgb,var(--gold) 18%,var(--surface));color:var(--accent)}
+.att-opt>span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.att-opt b{font-size:12.5px;font-weight:600}
+.att-opt small{font-family:var(--font-mono);font-size:9.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-note{margin:8px 6px 2px;font-size:10px;line-height:1.5;color:var(--muted)}
+.att-drop{position:absolute;inset:0;z-index:7;display:grid;place-items:center;border-radius:var(--r-md);background:color-mix(in srgb,var(--surface) 74%,transparent);border:2px dashed var(--accent);opacity:0;pointer-events:none;transition:opacity .18s ease}
+.composer.dragging .att-drop{opacity:1}
+.composer.dragging{border-color:var(--accent)}
+.att-drop span{display:flex;align-items:center;gap:9px;padding:12px 18px;border-radius:99px;background:var(--surface);border:1px solid var(--line2);box-shadow:var(--shadow-2);font-size:12px;font-weight:600;color:var(--accent)}
+.att-alert{display:flex;gap:8px;align-items:flex-start;margin:0;padding:10px 12px;border-radius:var(--r-sm);border:1px solid color-mix(in srgb,var(--danger) 45%,var(--line));background:var(--danger-bg);color:var(--danger);font-size:12px;line-height:1.55}
+.att-hint{font-family:var(--font-mono);font-size:9.5px;color:var(--accent);margin-left:5px}
+.att-chips{display:flex;flex-wrap:wrap;margin-top:6px}
+.att-chip{display:inline-flex;align-items:center;gap:5px;max-width:100%;margin:4px 6px 0 0;padding:3px 7px;border-radius:6px;background:var(--surface);border:1px solid var(--line);font-family:var(--font-mono);font-size:9.5px;color:var(--muted)}
+.att-chip>span{max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-chip svg{flex:none;color:var(--accent)}
+@media (max-width:600px){
+  .att-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .att-thumb{aspect-ratio:4/3}
+  .att-panel{left:0;right:0;width:auto}
+  .att-btn{width:34px;height:34px;margin-top:4px}
+  .composer-main{gap:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  .att-card,.att-panel,.att-panel.out,.att-spin::after{animation:none!important}
+  .att-x:hover{transform:none}
+  .att-prog i{transition:none}
+  .att-btn,.att-opt,.att-x{transition:none}
+}
+
+</style>
 </body></html>
